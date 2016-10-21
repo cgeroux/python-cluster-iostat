@@ -83,8 +83,9 @@ def removeAllLogs(hostname,device="/dev/vdb"):
   
   #remove logs on hosts
   for host in hostname:
-    print(host+": removing log file ...")
-    runCmdOnHost(host,"rm",logFileName)
+    logFileName=makeLogFileName(host,device)
+    print(host+": removing log file \""+logFileName+"\" ...")
+    runCmdOnHost(host,"rm","-f",logFileName)
 def startIostat(hostname,device="/dev/vdb",interval=10):
   """Starts an iostat process monitoring the given device at the given interval
   of seconds
@@ -260,15 +261,14 @@ def main():
   #ensureIostatNotRunning(nodesHostNames)
   
   #2) stop logging and remove logs
-  #ensureIostatNotRunning(nodesHostNames)
-  #removeAllLogs(nodesHostNames)
+  ensureIostatNotRunning(nodesHostNames)
+  removeAllLogs(nodesHostNames)
   
   #3) start logging
   #ensureIostatRunning(nodesHostNames)
   
   #4) collect logs and plot
-  collectLogs(nodesHostNames)
-  plotLogs(nodesHostNames)
-  
+  #collectLogs(nodesHostNames)
+  #plotLogs(nodesHostNames)
 if __name__ == "__main__":
   main()
