@@ -10,11 +10,26 @@ import matplotlib.pyplot as plt
 
 def parseOptions():
   """Parses command line options
-  
   """
   
-  parser=op.OptionParser(usage="Usage: %prog [options] NODEFILE0 NODEFILE1 ..."
-    ,version="%prog 1.0",description="")
+  parser=op.OptionParser(usage="Usage: %prog [options] COMMAND1 COMMAND2 ..."
+    ,version="%prog 1.0",description="Performs various actions "
+    +"specified by COMMAND on a given set of hosts. These actions "
+    +"have to do with managing log information from iostat on the "
+    +"various nodes. The commands are:"
+    +"stop (stop iostat from writing to logs)"
+    +", clean (stop iostat and remove logs)"
+    +", start(start iostat writing to logs if not already)"
+    +", collect (copy logs back to current host)"
+    +", plot(create matplotlib plots of stats)"
+    )
+  parser.add_option("-n",help="Add a file which lists host names separated"
+    +" by newlines",default=[],action="append",dest="nodeList")
+  parser.add_option("-f",help="Set frequency of reporting from iostat, used"
+    +"with \"start\" command.",default=10,dest="reportFrequency")
+  parser.add_option("-c",help="Set column to plot from iostat, used"
+    +"with \"plot\" command (11=read speed in MB/s, 12=write speed in MB/s)."
+    ,default=11,dest="plotColumn")
   
   #parse command line options
   return parser.parse_args()
@@ -229,46 +244,57 @@ def readLog(iostatLog):
       data[count].append(float(item))
       count+=1
   return data
-def plotLog(data,filename,y=12):
-  plt.plot(data[0],data[y])
+def plotLog(data,filename,y=11):
+  plt.plot(data[0],data[y],'-o')
   plt.gcf().autofmt_xdate()
   plt.savefig(filename+".pdf")
   plt.close()
-def plotLogs(hostnames,device="/dev/vdb"):
+def plotLogs(hostnames,device="/dev/vdb",column=11):
   for host in hostnames:
     logFileName=makeLogFileName(host,device)
     logFileNameNoExt,ext=os.path.splitext(logFileName)
     print("plotting log to file \""+logFileNameNoExt+".pdf\"")
     data=readLog(logFileName)
-    plotLog(data,logFileNameNoExt)
+    plotLog(data,logFileNameNoExt,y=column)
 def main():
   
   #parse command line options
   (options,args)=parseOptions()
   
   if len(args)<1:
-    raise Exception("Expected to get a path to a file containing a list of "
-      +"nodes")
+    raise Exception("Expected to get at least one command to perform on "
+      +"nodes.")
+  
+  if len(options.nodeList)<1:
+    raise Exception("No nodes to perform commands on, specify a file "
+      +"containing a list of nodes with -n command. See help with -h "
+      +"option for details.")
   
   #get a list of nodes
   nodesHostNames=[]
-  for path in args:
+  for path in options.nodeList:
     f=open(path)
     for line in f:
       nodesHostNames.append(line.strip())
   
-  #1) stop logging and leave logs
-  #ensureIostatNotRunning(nodesHostNames)
-  
-  #2) stop logging and remove logs
-  ensureIostatNotRunning(nodesHostNames)
-  removeAllLogs(nodesHostNames)
-  
-  #3) start logging
-  #ensureIostatRunning(nodesHostNames)
-  
-  #4) collect logs and plot
-  #collectLogs(nodesHostNames)
-  #plotLogs(nodesHostNames)
+  #check to make sure all commands are valid commands
+  validCommands=["stop","start","clean","clean","collect","plot"]
+  for command in args:
+    if command not in validCommands:
+      raise Exception("Given command \""+command
+        +"\" not in list of valid commands "+str(validCommands))
+
+  for command in args:
+    if command=="stop":
+      ensureIostatNotRunning(nodesHostNames)
+    elif command=="clean":
+      ensureIostatNotRunning(nodesHostNames)
+      removeAllLogs(nodesHostNames)
+    elif command=="start":
+      ensureIostatRunning(nodesHostNames,interval=options.reportFrequency)
+    elif command=="collect":
+      collectLogs(nodesHostNames)
+    elif command=="plot":
+      plotLogs(nodesHostNames,column=options.plotColumn)
 if __name__ == "__main__":
   main()
